@@ -1,10 +1,10 @@
-import { SmolCanvas, Vector, random } from "../smolcanvas.js";
+import { SmolCanvas, Vector, random, randomRange } from "../smolcanvas.js";
 
 const c = new SmolCanvas();
 
 class Particle {
   constructor() {
-    this.vel = new Vector();
+    this.vel = new Vector(2);
     this.x = 0;
     this.y = 0;
     this.r = 0;
@@ -15,31 +15,32 @@ class Particle {
   }
 
   reset() {
-    this.vel.x = random(-80, 80);
-    this.vel.y = random(-80, 80);
+    this.vel.setX(randomRange(-80, 80));
+    this.vel.setY(randomRange(-80, 80));
     this.x = c.mouseX;
     this.y = c.mouseY;
-    this.r = random(0.7, 1);
-    this.g = random(0.7, 1);
-    this.b = random(0.7, 1);
-    this.radius = random(20);
+    this.r = randomRange(0.7, 1);
+    this.g = randomRange(0.7, 1);
+    this.b = randomRange(0.7, 1);
+    this.radius = randomRange(20);
   }
 
+  /** @param {number} dt */
   update(dt) {
-    this.x += this.vel.x * dt;
-    this.y += this.vel.y * dt;
+    this.x += this.vel.x() * dt;
+    this.y += this.vel.y() * dt;
     this.radius -= 5 * dt;
 
-    if (this.dead) this.reset();
+    if (this.dead()) this.reset();
   }
 
-  /** @prop {boolean} */
-  get dead() {
+  /** @return {boolean} */
+  dead() {
     return (
       this.x < 0 ||
-      this.x > c.width() ||
+      this.x > c.width ||
       this.y < 0 ||
-      this.y > c.height() ||
+      this.y > c.height ||
       this.radius < 0
     );
   }
@@ -50,6 +51,7 @@ class Particle {
   }
 }
 
+/** @type {!Array<Particle>} */
 const particles = [];
 
 c.setup(
@@ -62,15 +64,13 @@ c.setup(
 
 /** @this {SmolCanvas}*/
 c.update = function(dt) {
-  for (const particle of particles) particle.update(dt);
+  particles.forEach(p => p.update(dt));
 };
 
 /** @this {SmolCanvas} */
 c.draw = function() {
   this.background(0);
   this.fillRGB(1, 1, 1);
-  this.strokeRGB(1, 1, 1);
   this.text(10, 10, `FPS: ${Math.round(this.fps)}`);
-  this.strokeWeight(0.5);
   for (const particle of particles) particle.draw();
 };

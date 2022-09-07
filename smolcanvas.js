@@ -1,23 +1,31 @@
-/** Create a new SmolCanvas object
+/**
  * @constructor
- * @param {HTMLCanvasElement=} canvas
+ * @param{HTMLCanvasElement=} canvas
  */
 function SmolCanvas(canvas) {
   /** @private {HTMLCanvasElement} */
-  this.canvas = canvas || document.createElement("canvas");
+  this.canvas =
+    canvas ||
+    /** @type {!HTMLCanvasElement} */ (document.createElement("canvas"));
   if (canvas === undefined) document.body.appendChild(this.canvas);
-
   /** @private {CanvasRenderingContext2D} */
-  this.ctx = this.canvas.getContext("2d", { alpha: false });
+  this.ctx = /** @type {!CanvasRenderingContext2D} */ (this.canvas.getContext(
+    "2d",
+    { alpha: false }
+  ));
 
-  // Mouse position
-
-  /** @prop {number} */
+  /** @type {number} */
   this.mouseX = 0;
-  /** @prop {number} */
+  /** @type {number} */
   this.mouseY = 0;
 
+  /** @type {number} */
+  this.width = this.canvas.width;
+  /** @type {number} */
+  this.height = this.canvas.height;
+
   // Fill and stroke enable
+
   /** @private {boolean} */
   this.fillActive = false;
 
@@ -26,8 +34,9 @@ function SmolCanvas(canvas) {
 
   // Delta time and FPS
 
-  /** @prop {number} */
+  /** @type {number} */
   this.fps = 0;
+
   /** @private {number} */
   this.last_time = 0;
 
@@ -37,7 +46,10 @@ function SmolCanvas(canvas) {
   });
 
   this.canvas.addEventListener("touchmove", event => {
-    const mappedEvent = touchEventToMouse(this.canvas, event);
+    const mappedEvent = touchEventToMouse(
+      this.canvas,
+      /** @type {!TouchEvent} */ (event)
+    );
     this.mouseX = mappedEvent.x;
     this.mouseY = mappedEvent.y;
   });
@@ -79,15 +91,7 @@ SmolCanvas.prototype.setup = function(cb) {
   cb.call(this);
 };
 
-/** @return {number} */
-SmolCanvas.prototype.width = function() {
-  return this.canvas.width;
-};
-
-/** @return {number} */
-SmolCanvas.prototype.height = function() {
-  return this.canvas.height;
-};
+// Size
 
 /**
  * Sets the size of the canvas
@@ -95,8 +99,8 @@ SmolCanvas.prototype.height = function() {
  * @param {number=} height Height
  */
 SmolCanvas.prototype.size = function(width, height) {
-  this.canvas.width = width;
-  this.canvas.height = height || width;
+  this.width = this.canvas.width = width;
+  this.height = this.canvas.height = height || width;
 };
 
 SmolCanvas.prototype.fillWindow = function() {
@@ -118,25 +122,30 @@ SmolCanvas.prototype.animationFrame = function(timestamp) {
     this.fps = this.fps * smoothing + fps * (1.0 - smoothing);
   }
   this.last_time = timestamp;
-  if (this.update) this.update(dt);
+  if (this.update) this.update.call(this, dt);
   this.transformPush();
-  if (this.draw) this.draw();
+  if (this.draw) this.draw.call(this);
   this.transformPop();
   this.requestAnimationFrame(this.animationFrame);
 };
 
 /**
  * Fill the background of the canvas
- * @param {number} c1
- * @param {number=} c2
- * @param {number=} c3
- * @param {number=} c4
+ * @param {number} value
  */
-SmolCanvas.prototype.background = function(c1, c2, c3, c4) {
-  if (c1 !== undefined && c2 === undefined) {
-    this.fillRGB(c1, c1, c1);
-    this.ctx.fillRect(0, 0, this.width(), this.height());
-  }
+SmolCanvas.prototype.background = function(value) {
+  this.backgroundRGB(value, value, value);
+};
+
+/**
+ * Fill the canvas with an RGB color
+ * @param {number} r
+ * @param {number} g
+ * @param {number} b
+ */
+SmolCanvas.prototype.backgroundRGB = function(r, g, b) {
+  this.fillRGB(r, g, b);
+  this.ctx.fillRect(0, 0, this.width, this.height);
 };
 
 /**
@@ -309,62 +318,99 @@ function RGBA(r, g, b, a = 1) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-class Vector {
-  /**
-   * @param {...number} values
-   */
-  constructor(...values) {
-    /** @private @prop {Array<number>} */
-    this.values = [];
-  }
+/**
+ * N-dimension vector
+ * @constructor
+ * @param {number|!Array<number>} values
+ */
+function Vector(values) {
+  /** @type {!Array<number>} */
+  this.numbers = [];
 
-  /**
-   * Subtract another vector from this one
-   * @param {Vector} other
-   * @return {Vector} New vector
-   */
-  sub(other) {
-    if (this.values.length !== other.values.length) throw new Error();
-    let vals = [];
-    for (let i = 0; i < this.values.length; i++) {
-      vals.push(this.values[i] - other.values[i]);
-    }
-    return new Vector(...vals);
-  }
-
-  /**
-   * @return {number}
-   */
-  mag() {
-    let sum = 0;
-    for (const value of this.values) sum += value * value;
-    return Math.sqrt(sum);
-  }
-
-  get x() {
-    return this.values[0];
-  }
-
-  set x(val) {
-    this.values[0] = val;
-  }
-
-  get y() {
-    return this.values[1];
-  }
-
-  set y(val) {
-    this.values[1] = val;
-  }
-
-  get z() {
-    return this.values[2];
-  }
-
-  set z(val) {
-    this.values[2] = val;
-  }
+  for (let i = 0; i < values; i++) this.numbers.push(0);
 }
+
+/**
+ * @param {number} x
+ * @param {number} y
+ * @param {number=} z
+ * @return {Vector}
+ */
+Vector.create = function(x, y, z) {
+  const n = z === undefined ? 2 : 3;
+  const vec = new Vector(n);
+  vec.setX(x);
+  vec.setY(y);
+  if (z !== undefined) vec.setZ(z);
+  return vec;
+};
+
+/**
+ * Subtract another vector from this one
+ * @param {Vector} other
+ * @return {Vector} New vector
+ */
+Vector.prototype.sub = function(other) {
+  let vals = [];
+  for (let i = 0; i < this.numbers.length; i++) {
+    vals.push(this.numbers[i] - other.numbers[i]);
+  }
+  return new Vector(vals);
+};
+
+/**
+ * @return {number}
+ */
+Vector.prototype.mag = function() {
+  let sum = 0;
+  for (const value of this.numbers) sum += value * value;
+  return Math.sqrt(sum);
+};
+
+/**
+ * @return {number}
+ */
+Vector.prototype.x = function() {
+  return this.numbers[0];
+};
+
+/**
+ * @param {number} val
+ * @return {number}
+ */
+Vector.prototype.setX = function(val) {
+  return (this.numbers[0] = val);
+};
+
+/**
+ * @return {number}
+ */
+Vector.prototype.y = function() {
+  return this.numbers[1];
+};
+
+/**
+ * @param {number} val
+ * @return {number}
+ */
+Vector.prototype.setY = function(val) {
+  return (this.numbers[1] = val);
+};
+
+/**
+ * @return {number}
+ */
+Vector.prototype.z = function() {
+  return this.numbers[2];
+};
+
+/**
+ * @param {number} val
+ * @return {number}
+ */
+Vector.prototype.setZ = function(val) {
+  return (this.numbers[2] = val);
+};
 
 /**
  * Return a random number
@@ -373,20 +419,18 @@ class Vector {
  * @return {number}
  */
 function random(n1, n2) {
-  if (n1 === undefined && n2 === undefined) return randomRange(0, 1);
-  if (n1 !== undefined && n2 === undefined) return randomRange(0, n1);
-  if (n1 !== undefined && n2 !== undefined) return randomRange(n1, n2);
-  throw new Error();
+  if (typeof n1 === "undefined") return randomRange(0, 1);
+  if (typeof n2 === "undefined") return randomRange(0, n1);
+  return randomRange(n1, n2);
 }
 
 /**
  * Get a random float in range
- * @private
  * @param {number} min
  * @param {number} max
  * @return {number}
  */
-function randomRange(min, max) {
+function randomRange(min = 0, max = 1) {
   return map(Math.random(), 0, 1, min, max);
 }
 
@@ -397,8 +441,8 @@ function randomRange(min, max) {
  */
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const x = a[i];
+    let j = Math.floor(randomRange(0, i + 1));
+    let x = a[i];
     a[i] = a[j];
     a[j] = x;
   }
@@ -409,9 +453,10 @@ function shuffle(a) {
 
 /**
  * Turns a touch event into mouse coordinates
+ * @private
  * @param {HTMLCanvasElement} canvas
  * @param {TouchEvent} event
- * @return {dict}
+ * @return {{x:number, y:number}}
  */
 function touchEventToMouse(canvas, event) {
   const clientRect = canvas.getBoundingClientRect();
@@ -422,4 +467,4 @@ function touchEventToMouse(canvas, event) {
   };
 }
 
-export { SmolCanvas, Vector, random, map, shuffle, RGBA };
+export { SmolCanvas, Vector, random, randomRange, map, shuffle, RGBA };
